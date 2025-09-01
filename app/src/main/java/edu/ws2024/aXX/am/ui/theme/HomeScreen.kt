@@ -87,7 +87,7 @@ fun HomeScreen(navController: NavController) {
                         navController.navigate("game/${playerName.value}")
                     }
                 },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.defaultMinSize(20.dp)
             ) {
                 Text("Start Game")
             }

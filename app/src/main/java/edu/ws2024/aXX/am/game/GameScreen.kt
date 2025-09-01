@@ -1,3 +1,4 @@
+
 package edu.ws2024.aXX.am.game
 
 import android.media.MediaPlayer
@@ -11,6 +12,7 @@ import androidx.compose.ui.zIndex
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -26,13 +28,15 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import edu.ws2024.aXX.am.R
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-
+import kotlin.math.*
+import kotlin.random.Random
 
 // px → dp helper
 fun Float.toDp(): Dp = (this / 3.5f).dp
@@ -42,12 +46,22 @@ fun slopeTopY(x: Float, width: Float, height: Float): Float {
     return (height * 0.6f) + ((height * 0.4f) / width) * x
 }
 
+// Snow particle data class
+data class SnowParticle(
+    var x: Float,
+    var y: Float,
+    var speed: Float,
+    var size: Float,
+    var opacity: Float = 1f
+)
+
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun GameScreen(navController: NavController, playerName: String) {
     val context = LocalContext.current
+    val viewModel = remember { GameViewModel(context) }
     val vibrator = context.getSystemService(Vibrator::class.java)
-    val viewModel = remember { GameViewModel() }
+
 
     var showGameOverDialog by remember { mutableStateOf(false) }
     val configuration = LocalConfiguration.current
@@ -68,6 +82,23 @@ fun GameScreen(navController: NavController, playerName: String) {
     // Jump
     var skierJump by remember { mutableStateOf(0f) }
 
+    // Animation states
+    var animationTime by remember { mutableStateOf(0f) }
+
+    // Snow effects
+    var snowParticles by remember {
+        mutableStateOf(
+            List(15) {
+                SnowParticle(
+                    x = Random.nextFloat() * screenWidth * 2,
+                    y = Random.nextFloat() * screenHeight,
+                    speed = Random.nextFloat() * 3f + 1f,
+                    size = Random.nextFloat() * 4f + 2f
+                )
+            }
+        )
+    }
+
     // Media
     var bgmPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
     var jumpPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
@@ -77,6 +108,7 @@ fun GameScreen(navController: NavController, playerName: String) {
     var duration by remember { mutableStateOf(0) }
 
     LaunchedEffect(Unit) {
+        viewModel.startGame(context, playerName)
         vibrator?.vibrate(VibrationEffect.createOneShot(200, VibrationEffect.DEFAULT_AMPLITUDE))
 
         bgmPlayer = MediaPlayer.create(context, R.raw.bgm).apply {
@@ -90,22 +122,32 @@ fun GameScreen(navController: NavController, playerName: String) {
         viewModel.setCoins(10)
         val skierX = 100f
 
+        // Timer coroutine (only when running)
         launch {
             while (true) {
                 delay(1000)
-                duration++
-                viewModel.duration = duration.toLong()
+                if (viewModel.gameState == GameState.RUNNING && !showGameOverDialog) {
+                    duration++
+                    viewModel.duration = duration.toLong()
+                }
             }
         }
 
         while (true) {
-            delay(16)
+            delay(25)
 
             // Only freeze background/obstacles/coins if game over
+
             if (!showGameOverDialog) {
+                if (viewModel.gameState != GameState.RUNNING || showGameOverDialog) {
+                    continue
+                }
+
+                // === Normal game updates (only runs when RUNNING) ===
                 backgroundOffset -= 4f
                 if (backgroundOffset < -screenWidth) backgroundOffset = 0f
 
+                animationTime += 0.16f
                 // FIXED: Calculate skier position including jump
                 val skierYCurrent = slopeTopY(skierX, screenWidth.toFloat(), screenHeight.toFloat()) - skierJump - 60f
 
@@ -127,7 +169,7 @@ fun GameScreen(navController: NavController, playerName: String) {
                     val dyBottom = kotlin.math.abs(newY - skierBottomY)
 
                     // FIXED: Collision if obstacle hits ANY part of skier during any jump phase
-                    val collision = dx < 10 && (dyTop < 10 || dyCenter < 10 || dyBottom < 10)
+                    val collision = dx < 20 && (dyTop < 20 || dyCenter < 10 || dyBottom < 40)
 
                     if (collision && !showGameOverDialog) {
                         println("COLLISION DETECTED!")
@@ -174,7 +216,7 @@ fun GameScreen(navController: NavController, playerName: String) {
 
             // ✅ Jump keeps running even after Game Over
             if (skierJump > 0f) {
-                skierJump -= 4f   // slower decay
+                skierJump -= 10f   // slower decay
                 if (skierJump < 0f) skierJump = 0f
             }
         }
@@ -190,86 +232,52 @@ fun GameScreen(navController: NavController, playerName: String) {
     }
 
     // ===== Root layout =====
-    Column(Modifier.fillMaxSize()) {
-        // === HUD HEADER - Always visible at the top ===
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(60.dp)
-                .background(Color(0xCC1E88E5)) // Semi-transparent blue
-                .padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            // Player name
-            Text(
-                text = playerName,
-                color = Color.White,
-                style = MaterialTheme.typography.titleMedium
-            )
-
-            // Coins counter with icon
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Image(
-                    painter = painterResource(id = R.drawable.coin),
-                    contentDescription = "Coins",
-                    modifier = Modifier
-                        .size(24.dp)
-                        .padding(end = 4.dp)
-                )
+    Box(Modifier.fillMaxSize()) {
+        if (viewModel.gameState == GameState.PAUSED) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.5f)) // dim background
+                    .zIndex(15f), // keep it above game content but below dialog
+                contentAlignment = Alignment.Center
+            ) {
                 Text(
-                    text = "${viewModel.coinsCount}",
+                    text = "Game suspended…",
                     color = Color.White,
-                    style = MaterialTheme.typography.titleMedium
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold
                 )
             }
-
-            // Time counter
-            Text(
-                text = "${viewModel.duration}s",
-                color = Color.White,
-                style = MaterialTheme.typography.titleMedium
-            )
         }
-
-        // Pause button
-        IconButton(
-            onClick = {
-                viewModel.togglePause()
-                if (viewModel.gameState == GameState.PAUSED) bgmPlayer?.pause() else bgmPlayer?.start()
-            },
-            modifier = Modifier
-                .align(Alignment.End)
-                .padding(top = 8.dp, end = 16.dp)
-                .zIndex(2f)
-        ) {
-            Icon(
-                imageVector = if (viewModel.gameState == GameState.PAUSED) Icons.Default.PlayArrow else Icons.Default.Pause,
-                contentDescription = "Pause/Play",
-                tint = Color.White,
-                modifier = Modifier.size(30.dp)
-            )
-        }
-
-        // === Game content area ===
+        // === Game content area (full screen background) ===
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .weight(1f)
-                .zIndex(0f)
         ) {
-            // Sky
+            // Background mountains (bg.png)
+            Image(
+                painter = painterResource(id = R.drawable.bg),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+
+            // Scrolling trees layer
             Box(
                 modifier = Modifier
                     .fillMaxSize()
             ) {
-                // Trees
+
+
+                // Trees scrolling background
                 Image(
                     painter = painterResource(id = R.drawable.trees),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .fillMaxSize()
+                        .padding(top=300.dp)
+                        .padding(top=200.dp)
                         .offset(x = backgroundOffset.dp)
                 )
                 Image(
@@ -278,6 +286,7 @@ fun GameScreen(navController: NavController, playerName: String) {
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .fillMaxSize()
+                        .padding(top=300.dp)
                         .offset(x = (backgroundOffset + screenWidth).dp)
                 )
             }
@@ -301,6 +310,8 @@ fun GameScreen(navController: NavController, playerName: String) {
                     )
                 )
             }
+        }
+
 
             // Obstacles
             obstaclePositions.forEach { pos ->
@@ -311,20 +322,21 @@ fun GameScreen(navController: NavController, playerName: String) {
                         .size(50.dp)
                         .absoluteOffset(x = pos.x.dp, y = pos.y.dp)
                 )
-            }
 
-            // Coins
-            coinPositions.forEach { pos ->
+
+            // Coins with subtle floating animation
+            coinPositions.forEachIndexed { index, pos ->
+                val floatOffset = sin(animationTime * 2f + index) * 2f
                 Image(
                     painter = painterResource(id = R.drawable.coin),
                     contentDescription = "Coin",
                     modifier = Modifier
                         .size(30.dp)
-                        .absoluteOffset(x = pos.x.dp, y = pos.y.dp)
+                        .absoluteOffset(x = pos.x.dp, y = (pos.y + floatOffset).dp)
                 )
             }
 
-            // Skier
+            // Original Skier image (unchanged)
             val skierX = 50f
             val skierYCurrent =
                 slopeTopY(skierX, screenWidth.toFloat(), screenHeight.toFloat()) - skierJump - 60f
@@ -344,10 +356,11 @@ fun GameScreen(navController: NavController, playerName: String) {
             )
         }
 
+
         // Game Over dialog
         if (showGameOverDialog) {
             AlertDialog(
-                modifier = Modifier.zIndex(3f),
+                modifier = Modifier.zIndex(20f),
                 onDismissRequest = { showGameOverDialog = false },
                 title = { Text("Game Over") },
                 text = {
@@ -376,9 +389,20 @@ fun GameScreen(navController: NavController, playerName: String) {
                         showGameOverDialog = false
                         skierJump = 0f
                         duration = 0
+                        animationTime = 0f
                         backgroundOffset = 0f
                         obstaclePositions = List(1) { Offset((screenWidth + it * 600).toFloat(), 0f) }
                         coinPositions = List(3) { Offset((screenWidth + 200 + it * 400).toFloat(), 0f) }
+
+                        // Reset snow particles
+                        snowParticles = List(15) {
+                            SnowParticle(
+                                x = Random.nextFloat() * screenWidth * 2,
+                                y = Random.nextFloat() * screenHeight,
+                                speed = Random.nextFloat() * 3f + 1f,
+                                size = Random.nextFloat() * 4f + 2f
+                            )
+                        }
 
                         bgmPlayer?.seekTo(0)
                         bgmPlayer?.start()
@@ -397,5 +421,109 @@ fun GameScreen(navController: NavController, playerName: String) {
                 containerColor = Color.White
             )
         }
+
+
+
+
     }
+        // === Top HEADER - Floating ===
+        Box(
+
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 600.dp)
+                .height(80.dp)
+                .background(Color.Transparent)
+
+                .padding(8.dp)
+        ) {
+            // Pause andd play button on the left
+            IconButton(
+                onClick = {
+                    if (viewModel.gameState == GameState.RUNNING) {
+                        viewModel.gameState = GameState.PAUSED
+                        bgmPlayer?.pause()
+                    } else {
+                        viewModel.gameState = GameState.RUNNING
+                        bgmPlayer?.start()
+                    }
+                },
+                modifier = Modifier
+                    .size(48.dp)
+                    .background(
+                        color = Color(0x66000000),
+                        shape = androidx.compose.foundation.shape.CircleShape
+                    )
+                    .align(Alignment.CenterStart) //
+            ) {
+                Icon(
+                    imageVector = if (viewModel.gameState == GameState.PAUSED) Icons.Default.PlayArrow else Icons.Default.Pause,
+                    contentDescription = "Pause/Play",
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            // Center info (Player name)
+            Text(
+                text = playerName,
+                color = Color.White,
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier
+                    .align(Alignment.Center) //
+                    .background(
+                        color = Color(0x66000000),
+                        shape = RoundedCornerShape(20.dp)
+                    )
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+
+            // Right side info (Coins + Time)
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.align(Alignment.CenterEnd) //
+            ) {
+                // Coins counter
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .background(
+                            color = Color(0x88FFA500),
+                            shape = RoundedCornerShape(16.dp)
+                        )
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.coin),
+                        contentDescription = "Coins",
+                        modifier = Modifier
+                            .size(20.dp)
+                            .padding(end = 4.dp)
+                    )
+                    Text(
+                        text = "${viewModel.coinsCount}",
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                // Time counter
+                Text(
+                    text = "${viewModel.duration}s",
+                    color = Color.White,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .background(
+                            color = Color(0x66000000),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        .padding(horizontal = 12.dp, vertical = 4.dp)
+                )
+            }
+        }
+
+
 }

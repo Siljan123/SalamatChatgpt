@@ -9,9 +9,11 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Offset
 import kotlinx.coroutines.*
 import edu.ws2024.aXX.am.R
+import edu.ws2024.aXX.am.data.GameRecord
+import edu.ws2024.aXX.am.data.RankingsManager
 import kotlin.random.Random
 
-class GameViewModel {
+class GameViewModel (private val context: Context){
     var gameState by mutableStateOf(GameState.RUNNING)
     var coinsCount by mutableStateOf(10)
     var duration by mutableStateOf(0L)
@@ -28,6 +30,7 @@ class GameViewModel {
     var groundLevel by mutableStateOf(600f) // default slope ground
 
     fun startGame(context: Context, playerName: String) {
+
         if (gameState == GameState.RUNNING) return
 
         gameState = GameState.RUNNING
@@ -115,6 +118,15 @@ class GameViewModel {
             if (skierRect.overlaps(obstacleRect) && !isJumping) {
                 gameState = GameState.GAME_OVER
                 bgMusic?.stop()
+
+                CoroutineScope(Dispatchers.IO).launch {
+                    val record = GameRecord(
+                        playerName = "Player",   // TODO: pass actual name
+                        coins = coinsCount,
+                        duration = duration.toInt()
+                    )
+                    RankingsManager.saveRanking(context, record)
+                }
                 return
             }
         }

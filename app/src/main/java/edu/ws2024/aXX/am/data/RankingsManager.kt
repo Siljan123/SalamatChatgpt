@@ -20,8 +20,12 @@ object RankingsManager {
         val currentRankings = getRankingsList(context).toMutableList()
         currentRankings.add(newRecord)
 
-        // Sort by duration descending
-        val sortedRankings = currentRankings.sortedByDescending { it.duration }
+        // Sort: duration desc → coins desc → timestamp desc
+        val sortedRankings = currentRankings.sortedWith(
+            compareByDescending<GameRecord> { it.duration }
+                .thenByDescending { it.coins }
+                .thenByDescending { it.timestamp }
+        )
 
         context.dataStore.edit { preferences ->
             preferences[RANKINGS_KEY] = gson.toJson(sortedRankings)

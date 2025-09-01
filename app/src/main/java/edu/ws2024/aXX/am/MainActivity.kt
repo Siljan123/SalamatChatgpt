@@ -35,7 +35,10 @@ class MainActivity : ComponentActivity() {
                             val playerName = backStackEntry.arguments?.getString("playerName") ?: ""
                             GameScreen(navController, playerName)
                         }
-                        composable("rankings") { RankingsScreen(navController) }
+                        composable("rankings/{highlightId}") { backStackEntry ->
+                            val highlightId = backStackEntry.arguments?.getString("highlightId")?.toLongOrNull()
+                            RankingsScreen(navController, highlightId)
+                        }
                         composable("settings") { SettingsScreen(navController) }
                     }
                 }
