@@ -12,9 +12,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import edu.ws2024.aXX.am.R
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -25,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -53,16 +57,18 @@ fun HomeScreen(navController: NavController) {
         Image(
             painter = painterResource(id = R.drawable.bg),
             contentDescription = null,
-            contentScale = ContentScale.Crop, // fills the Box
+            contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize()
         )
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(32.dp),
+                .padding(horizontal = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
         ) {
+            // Title
             Text(
                 text = "Go Skiing",
                 fontSize = 36.sp,
@@ -70,18 +76,30 @@ fun HomeScreen(navController: NavController) {
                 color = Color.White
             )
 
-            Spacer(modifier = Modifier.height(64.dp))
+            Spacer(modifier = Modifier.height(48.dp))
 
+            // Player name input
             OutlinedTextField(
                 value = playerName.value,
                 onValueChange = { playerName.value = it },
-                label = { Text("Player name") },
+                label = { Text("Player name", color = Color.Black, fontWeight = FontWeight.Bold) },
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Color.Black,
+                    unfocusedBorderColor = Color.Black,
+                    focusedLabelColor = Color.Black,
+                    unfocusedLabelColor = Color.Black,
+                    cursorColor = Color.Black
+                ),
+                shape = RectangleShape
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(32.dp))
 
+            // Start Game button
             Button(
                 onClick = {
                     if (playerName.value.isBlank()) {
@@ -90,30 +108,59 @@ fun HomeScreen(navController: NavController) {
                         navController.navigate("game/${playerName.value}")
                     }
                 },
-                modifier = Modifier.defaultMinSize(20.dp)
+                modifier = Modifier
+                    .width(150.dp)
+                    .height(50.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF90CAF9),
+                    contentColor = Color.Black
+                ),
+                shape = RectangleShape
             ) {
-                Text("Start Game")
+                Text("Start Game", fontWeight = FontWeight.Bold)
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
+            // Rankings button
             Button(
-                onClick = {  "rankings/$playerName?coins=${viewModel.coinsCount}&duration=${viewModel.duration}" },
-                modifier = Modifier.defaultMinSize(20.dp)
+                onClick = {
+                    viewModel.cleanup()
+                    navController.navigate(
+                        "rankings/$playerName?coins=${viewModel.coinsCount}&duration=${viewModel.duration}"
+                    )
+                },
+                modifier = Modifier
+                    .width(150.dp)
+                    .height(50.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF90CAF9),
+                    contentColor = Color.Black
+                ),
+                shape = RectangleShape
             ) {
-                Text("Rankings")
+                Text("Rankings", fontWeight = FontWeight.Bold)
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
+            // Settings button
             Button(
                 onClick = { navController.navigate("settings") },
-                modifier = Modifier.defaultMinSize(20.dp)
+                modifier = Modifier
+                    .width(150.dp)
+                    .height(50.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF90CAF9),
+                    contentColor = Color.Black
+                ),
+                shape = RectangleShape
             ) {
-                Text("Setting")
+                Text("Setting", fontWeight = FontWeight.Bold)
             }
         }
 
+        // Error dialog
         if (showError) {
             androidx.compose.material3.AlertDialog(
                 onDismissRequest = { showError = false },
