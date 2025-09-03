@@ -2,18 +2,19 @@ package edu.ws2024.aXX.am.game
 
 import android.content.Context
 import android.media.MediaPlayer
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.geometry.Rect
+import androidx.compose.runtime.*
 import androidx.compose.ui.geometry.Offset
-import kotlinx.coroutines.*
+import androidx.compose.ui.geometry.Rect
+import androidx.lifecycle.ViewModel
 import edu.ws2024.aXX.am.R
 import edu.ws2024.aXX.am.data.GameRecord
 import edu.ws2024.aXX.am.data.RankingsManager
+import kotlinx.coroutines.*
 import kotlin.random.Random
 
-class GameViewModel (private val context: Context){
+class GameViewModel : ViewModel() {
+
+    private var playerName: String = "Player"
     var gameState by mutableStateOf(GameState.RUNNING)
     var coinsCount by mutableStateOf(10)
     var duration by mutableStateOf(0L)
@@ -23,16 +24,16 @@ class GameViewModel (private val context: Context){
 
     var obstacles = mutableListOf<GameObject>()
     var coinObjects = mutableListOf<GameObject>()
-    var skierPosition by mutableStateOf(Offset(300f, 600f)) // Initial position
+    var skierPosition by mutableStateOf(Offset(300f, 600f))
+    var groundLevel by mutableStateOf(600f)
 
     private var gameJob: Job? = null
     private var bgMusic: MediaPlayer? = null
-    var groundLevel by mutableStateOf(600f) // default slope ground
 
     fun startGame(context: Context, playerName: String) {
-
         if (gameState == GameState.RUNNING) return
 
+        this.playerName = playerName
         gameState = GameState.RUNNING
         coinsCount = 10
         duration = 0L
@@ -42,28 +43,19 @@ class GameViewModel (private val context: Context){
         coinObjects.clear()
         skierPosition = Offset(300f, groundLevel)
 
-        // Timer
-        gameJob = CoroutineScope(Dispatchers.Main).launch {
-            while (gameState != GameState.GAME_OVER) {
-                if (gameState == GameState.RUNNING) duration++
-                delay(1000)
-            }
-        }
-
-        // Game loop
         gameJob = CoroutineScope(Dispatchers.Main).launch {
             while (gameState != GameState.GAME_OVER) {
                 if (gameState == GameState.RUNNING) {
+                    duration++
                     updateGameObjects()
                     updateJump()
-                    checkCollisions()
+                    checkCollisions(context)
                     generateObjects()
                 }
-                delay(16) // ~60 FPS
+                delay(1000L / 60L) // ~60 FPS
             }
         }
 
-        // Background music
         try {
             bgMusic = MediaPlayer.create(context, R.raw.bgm)
             bgMusic?.isLooping = true
@@ -99,29 +91,28 @@ class GameViewModel (private val context: Context){
         return 150f * (4 * progress * (1 - progress))
     }
 
-    private fun checkCollisions() {
+    private fun checkCollisions(context: Context) {
         val skierRect = Rect(
-            left = skierPosition.x,
-            top = skierPosition.y,
-            right = skierPosition.x + 50f,
-            bottom = skierPosition.y + 220f
+            skierPosition.x,
+            skierPosition.y,
+            skierPosition.x + 50f,
+            skierPosition.y + 220f
         )
 
-        // Obstacles
         for (obstacle in obstacles) {
             val obstacleRect = Rect(
-                left = obstacle.x,
-                top = obstacle.y,
-                right = obstacle.x + obstacle.width,
-                bottom = obstacle.y + obstacle.height
+                obstacle.x,
+                obstacle.y,
+                obstacle.x + obstacle.width,
+                obstacle.y + obstacle.height
             )
             if (skierRect.overlaps(obstacleRect) && !isJumping) {
                 gameState = GameState.GAME_OVER
                 bgMusic?.stop()
 
                 CoroutineScope(Dispatchers.IO).launch {
-                    val record = GameRecord(
-                        playerName = "Player",   // TODO: pass actual name
+                     val record = GameRecord(
+                        playerName = playerName,
                         coins = coinsCount,
                         duration = duration.toInt()
                     )
@@ -131,15 +122,14 @@ class GameViewModel (private val context: Context){
             }
         }
 
-        // Coins
         val iterator = coinObjects.iterator()
         while (iterator.hasNext()) {
             val coin = iterator.next()
             val coinRect = Rect(
-                left = coin.x,
-                top = coin.y,
-                right = coin.x + coin.width,
-                bottom = coin.y + coin.height
+                coin.x,
+                coin.y,
+                coin.x + coin.width,
+                coin.y + coin.height
             )
             if (skierRect.overlaps(coinRect)) {
                 coinsCount++
@@ -150,15 +140,10 @@ class GameViewModel (private val context: Context){
 
     private fun generateObjects() {
         if (Random.nextInt(100) < 3 && obstacles.size < 3) {
-            obstacles.add(
-                GameObject(1000f, groundLevel - 80f, 80f, 80f, ObjectType.OBSTACLE)
-            )
+            obstacles.add(GameObject(1000f, groundLevel - 80f, 80f, 80f, ObjectType.OBSTACLE))
         }
-
         if (Random.nextInt(100) < 5 && coinObjects.size < 5) {
-            coinObjects.add(
-                GameObject(1000f, groundLevel - 150f, 60f, 60f, ObjectType.COIN)
-            )
+            coinObjects.add(GameObject(1000f, groundLevel - 150f, 60f, 60f, ObjectType.COIN))
         }
     }
 
@@ -169,9 +154,6 @@ class GameViewModel (private val context: Context){
             // TODO: play jump sound
         }
     }
-
-    fun setCoins(value: Int) { coinsCount = value }
-    fun setDuration(value: Int) { duration = value.toLong() }
 
     fun togglePause() {
         gameState = if (gameState == GameState.PAUSED) {
@@ -193,13 +175,10 @@ class GameViewModel (private val context: Context){
         gameJob?.cancel()
         bgMusic?.release()
     }
-
     fun incrementCoins() { coinsCount++ }
-    fun decrementCoins() { if (coinsCount > 0) coinsCount-- }
-    fun resetCoins(value: Int = 10) { coinsCount = value }
 }
 
-// ✅ Improved GameObject
+// GameObject and ObjectType remain unchanged
 data class GameObject(
     var x: Float,
     var y: Float,

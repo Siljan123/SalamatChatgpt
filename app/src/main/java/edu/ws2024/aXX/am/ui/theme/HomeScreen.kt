@@ -30,11 +30,14 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import edu.ws2024.aXX.am.game.GameViewModel
 
 @SuppressLint("RememberedMutableState")
 @Composable
 fun HomeScreen(navController: NavController) {
+    val viewModel: GameViewModel = viewModel()
     val playerName = remember { mutableStateOf("") }
     var showError by remember { mutableStateOf(false) }
 
@@ -95,7 +98,7 @@ fun HomeScreen(navController: NavController) {
             Spacer(modifier = Modifier.height(8.dp))
 
             Button(
-                onClick = { navController.navigate("rankings") },
+                onClick = {  "rankings/$playerName?coins=${viewModel.coinsCount}&duration=${viewModel.duration}" },
                 modifier = Modifier.defaultMinSize(20.dp)
             ) {
                 Text("Rankings")

@@ -31,6 +31,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import edu.ws2024.aXX.am.R
 import kotlinx.coroutines.delay
@@ -58,8 +60,10 @@ data class SnowParticle(
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun GameScreen(navController: NavController, playerName: String) {
+    val viewModel: GameViewModel = viewModel()
+
     val context = LocalContext.current
-    val viewModel = remember { GameViewModel(context) }
+
     val vibrator = context.getSystemService(Vibrator::class.java)
 
 
@@ -119,7 +123,7 @@ fun GameScreen(navController: NavController, playerName: String) {
         coinPlayer = MediaPlayer.create(context, R.raw.coin)
         gameOverPlayer = MediaPlayer.create(context, R.raw.game_over)
 
-        viewModel.setCoins(10)
+        viewModel.coinsCount = 10
         val skierX = 100f
 
         // Timer coroutine (only when running)
@@ -413,7 +417,9 @@ fun GameScreen(navController: NavController, playerName: String) {
                 dismissButton = {
                     TextButton(onClick = {
                         viewModel.cleanup()
-                        navController.navigate("rankings/$playerName")
+                        navController.navigate(
+                            "rankings/$playerName?coins=${viewModel.coinsCount}&duration=${viewModel.duration}"
+                        )
                     }) {
                         Text("Go To Rankings")
                     }
@@ -431,7 +437,7 @@ fun GameScreen(navController: NavController, playerName: String) {
 
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 600.dp)
+                .padding(bottom = 700.dp)
                 .height(80.dp)
                 .background(Color.Transparent)
 

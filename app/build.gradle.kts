@@ -55,9 +55,16 @@ dependencies {
     implementation("androidx.media:media:1.7.0") // For audio playback
     implementation("androidx.games:games-activity:2.0.2") // (Optional, for more advanced game control)
     implementation("com.google.accompanist:accompanist-permissions:0.32.0") // For screen recording permission
+    implementation ("androidx.room:room-runtime:2.5.0")
+    implementation ("androidx.room:room-ktx:2.5.0")
 
+    implementation ("androidx.datastore:datastore-preferences:1.0.0")
+    implementation ("androidx.lifecycle:lifecycle-viewmodel-compose:2.6.2")
     // For Gyroscope
-    implementation("androidx.lifecycle:lifecycle-service:2.7.0") // If using a Service for sensors
+    implementation("androidx.lifecycle:lifecycle-service:2.7.0")
+    implementation(libs.androidx.room.common.jvm)
+    implementation(libs.androidx.datastore.preferences.core.android)
+    // If using a Service for sensors
 
     androidTestImplementation(platform("androidx.compose:compose-bom:2024.02.00"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
